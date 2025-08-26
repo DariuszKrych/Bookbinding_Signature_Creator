@@ -6,6 +6,8 @@ from reportlab.pdfbase.ttfonts import TTFont
 import os
 import copy
 import math
+import glob
+import shutil
 
 print(f"\n\npypdf library version: {pypdf.__version__}\n"
       f"reportlab library version: {reportlab.__version__}\n")
@@ -29,8 +31,11 @@ def stamp_book(book_file_1, numbered_pdf_output):
         # Width coords: 841.92      # Height coords: 595.32     # Page Count: 209
         # 72 coordinate unit points per inch of physical length.
 
-    x_1 = (.5 + 4.95129 - .125)*72
-    x_2 = (.5 + (4.95129*2) + (2/2.54) - .125)*72
+    page_margins_inches = 0.5
+    column_gap_inches = 0.99
+    column_width_inches = 4.85
+    x_1 = (page_margins_inches + column_width_inches - .125)*72
+    x_2 = (page_margins_inches + (column_width_inches*2) + column_gap_inches - .125)*72
     page_num = 1
     page_doubling_adjust = 0
     while page_num < page_count+1:
@@ -119,13 +124,21 @@ def split_to_signatures(book_file, signature_pages, signature_save_folder):
             break
 
         if signature_num == full_sig_count+1:
+            if extra_sig_size == 0:
+                break
             small_sig_save_adjust = signature_pages_x2 - extra_sig_size
 
         left_side_num = page_num+sig_jump_up_adjust
         right_side_num = (signature_pages*4*signature_num)-page_num+1+sig_jump_up_adjust-(small_sig_save_adjust*2)
         full_page = pypdf.PageObject.create_blank_page(width=page_width, height=page_height)
-        full_page.merge_page(page_halves[left_side_num])
-        full_page.merge_translated_page(page_halves[right_side_num], half_width, 0)
+        if pages_in_sig % 2 == 0:
+            full_page.merge_page(page_halves[left_side_num])
+            full_page.merge_translated_page(page_halves[right_side_num], half_width, 0)
+            full_page.rotate(180)
+        else:
+            full_page.merge_page(page_halves[right_side_num])
+            full_page.merge_translated_page(page_halves[left_side_num], half_width, 0)
+
         print(f"Page halves {left_side_num} and {right_side_num} have been merged.")
 
         signature_pdf_writer.add_page(full_page)
@@ -146,18 +159,27 @@ def split_to_signatures(book_file, signature_pages, signature_save_folder):
             sig_jump_up_adjust = sig_jump_up_adjust + (signature_pages_x2)
 
 
-book_file_name = 'EDIT_THIS_PUT_YOUR_COOL_BOOK_PDF_NAME_HERE'
-book_input_location = 'Input/'+str(book_file_name)+'.pdf'
-book_output_location = 'Output/'+str(book_file_name)
+book_file_names = []
+book_file_paths = glob.glob('Input/*.pdf')
+print(book_file_paths)
+for book_file_path in book_file_paths:
+    book_file_names.append(book_file_path[6:-4])
+print(f"\nInput book file name(s):\n{book_file_names}")
 
-numbered_pdf_book_file = book_output_location+'/numbered_book.pdf'
-signature_split_pdfs = book_output_location+'/book_signatures'
-signature_page_count = 5 # EDIT THIS TO CHANGE THE PAGE COUNT PER SIGNATURE
+for book_file_name in book_file_names:
+    book_input_location = 'Input/'+str(book_file_name)+'.pdf'
+    book_output_location = 'Output/'+str(book_file_name)
 
-if not os.path.exists(signature_split_pdfs):
-    os.makedirs(signature_split_pdfs)
+    numbered_pdf_book_file = book_output_location+'/numbered_book.pdf'
+    signature_split_pdfs = book_output_location+'/book_signatures'
+    signature_page_count = 5 # EDIT THIS TO CHANGE THE PAGE COUNT PER SIGNATURE
 
-# Input: pdf_book_file                                    Output: numbered_pdf_book_file
-stamp_book(book_input_location, numbered_pdf_book_file)
-# Input: numbered_pdf_book_file & signature_page_count    Output: signature_split_pdfs
-split_to_signatures(numbered_pdf_book_file, signature_page_count, signature_split_pdfs)
+    if not os.path.exists(signature_split_pdfs):
+        os.makedirs(signature_split_pdfs)
+
+    # Input: pdf_book_file                                    Output: numbered_pdf_book_file
+    stamp_book(book_input_location, numbered_pdf_book_file)
+    # Input: numbered_pdf_book_file & signature_page_count    Output: signature_split_pdfs
+    split_to_signatures(numbered_pdf_book_file, signature_page_count, signature_split_pdfs)
+
+    shutil.move(book_input_location, book_output_location)
