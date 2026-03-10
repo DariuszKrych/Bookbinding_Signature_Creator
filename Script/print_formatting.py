@@ -6,8 +6,8 @@ from reportlab.pdfbase.ttfonts import TTFont
 import os
 import copy
 import math
-import glob
-import shutil
+from pathlib import Path
+
 
 print(f"\n\npypdf library version: {pypdf.__version__}\n"
       f"reportlab library version: {reportlab.__version__}\n")
@@ -16,10 +16,9 @@ pdfmetrics.registerFont(TTFont('Baskervville', 'Script/Baskervville-Regular.ttf'
 # https://fonts.google.com/specimen/Baskervville
 
 
-def stamp_book(book_file_1, numbered_pdf_output):
+def stamp_book(book_file_1, numbered_pdf_output, page_margins_inches, column_gap_inches, column_width_inches):
     with open(book_file_1, 'rb') as book_file:
         reader = pypdf.PdfReader(book_file)
-        # writer = pypdf.PdfWriter()
 
         first_page = reader.pages[0]
         page_width = first_page.mediabox.width
@@ -31,9 +30,6 @@ def stamp_book(book_file_1, numbered_pdf_output):
         # Width coords: 841.92      # Height coords: 595.32     # Page Count: 209
         # 72 coordinate unit points per inch of physical length.
 
-    page_margins_inches = 0.5
-    column_gap_inches = 0.99
-    column_width_inches = 4.85
     x_1 = (page_margins_inches + column_width_inches - .125)*72
     x_2 = (page_margins_inches + (column_width_inches*2) + column_gap_inches - .125)*72
     page_num = 1
@@ -49,7 +45,6 @@ def stamp_book(book_file_1, numbered_pdf_output):
 
         page_doubling_adjust = page_doubling_adjust + 1
         page_num = page_num + 1
-
 
 
     with open(book_file_1, 'rb') as book_file:
@@ -71,6 +66,12 @@ def stamp_book(book_file_1, numbered_pdf_output):
         # Write the final, merged PDF to a new file
         with open(numbered_pdf_output, "wb") as f_out:
             writer.write(f_out)
+
+    # Deleting pdf book number files to clean up for the next run
+    page_num_stamps_dir = Path("Script/page_num_stamps")
+
+    for item in page_num_stamps_dir.iterdir():
+        item.unlink()
 
 
 
@@ -157,29 +158,3 @@ def split_to_signatures(book_file, signature_pages, signature_save_folder):
             pages_in_sig = 1
             signature_num = signature_num + 1
             sig_jump_up_adjust = sig_jump_up_adjust + (signature_pages_x2)
-
-
-book_file_names = []
-book_file_paths = glob.glob('Input/*.pdf')
-print(book_file_paths)
-for book_file_path in book_file_paths:
-    book_file_names.append(book_file_path[6:-4])
-print(f"\nInput book file name(s):\n{book_file_names}")
-
-for book_file_name in book_file_names:
-    book_input_location = 'Input/'+str(book_file_name)+'.pdf'
-    book_output_location = 'Output/'+str(book_file_name)
-
-    numbered_pdf_book_file = book_output_location+'/numbered_book.pdf'
-    signature_split_pdfs = book_output_location+'/book_signatures'
-    signature_page_count = 5 # EDIT THIS TO CHANGE THE PAGE COUNT PER SIGNATURE
-
-    if not os.path.exists(signature_split_pdfs):
-        os.makedirs(signature_split_pdfs)
-
-    # Input: pdf_book_file                                    Output: numbered_pdf_book_file
-    stamp_book(book_input_location, numbered_pdf_book_file)
-    # Input: numbered_pdf_book_file & signature_page_count    Output: signature_split_pdfs
-    split_to_signatures(numbered_pdf_book_file, signature_page_count, signature_split_pdfs)
-
-    shutil.move(book_input_location, book_output_location)
